@@ -10,6 +10,8 @@ class ProductController extends Controller {
 
     public function get_category_products($slug, Request $request) {
         // Fetch the category by slug
+        $sort = $request->get('sort');
+
         $category = Category::with('products')->where('slug', $slug)->first();
 
         if (!$category) {
@@ -21,21 +23,27 @@ class ProductController extends Controller {
 
         // Fetch products associated with the category
         $products = $category->products();
-        // Apply sorting based on query parameter
-        $sort = $request->get('sort');
+
         if ($sort == 'best_sell') {
             $result = $products->orders->count();
-        } elseif ($sort == 'top_rated') {
-            $result = '';
-        } elseif ($sort == 'price_high_to_low') {
-            $result = '';
-        } elseif ($sort == 'price_low_to_high') {
-            $result = '';
-        } else {
-            $result = '';
         }
 
-        // Paginate or get the results
+        if ($sort == 'top_rated') {
+            $products->withAvg('reviews', 'rating')->orderBy('rating', 'desc');
+
+        }
+        
+        // Products By High to low price
+        if ($sort == 'price_high_to_low') {
+            $products = $products->orderBy('price', 'desc');
+        }
+        
+        // Products By Low to high price
+        if ($sort == 'price_low_to_high') {
+            $products = $products->orderBy('price', 'asc');
+        }
+        
+        // Get the results
         $products = $products->get();
 
         return response()->json($products);
