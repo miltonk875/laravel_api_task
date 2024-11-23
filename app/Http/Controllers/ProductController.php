@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use DB;
 
 class ProductController extends Controller {
 
@@ -16,35 +17,39 @@ class ProductController extends Controller {
 
         if (!$category) {
             return response()->json([
-                        'message' => 'Category not found.',
-                        'status' => 404,
-            ]);
+                        'message' => 'Category not found',
+                            ], 404);
         }
 
         // Fetch products associated with the category
-        $products = $category->products();
+        $category_products = $category->products();
 
         if ($sort == 'best_sell') {
-            $result = $products->orders->count();
+            $products = $category_products
+                    ->with(['orders' => function ($query) {
+                            $query->select('product_id', DB::raw('SUM(unit_price * quantity) as best_sell'))->groupBy('product_id');
+                        }])
+                    ->get();
         }
 
+        // Products By Top Rated
         if ($sort == 'top_rated') {
-            $products->withAvg('reviews', 'rating')->orderBy('rating', 'desc');
-
+            $products = $category_products->withCount(['reviews as average_rating' => function ($query) {
+                            $query->select(DB::raw('ROUND(AVG(rating), 1)'));
+                        }])
+                    ->orderBy('average_rating', 'desc')
+                    ->get();
         }
-        
+
         // Products By High to low price
         if ($sort == 'price_high_to_low') {
-            $products = $products->orderBy('price', 'desc');
+            $products = $category_products->orderBy('price', 'desc')->get();
         }
-        
+
         // Products By Low to high price
         if ($sort == 'price_low_to_high') {
-            $products = $products->orderBy('price', 'asc');
+            $products = $category_products->orderBy('price', 'asc')->get();
         }
-        
-        // Get the results
-        $products = $products->get();
 
         return response()->json($products);
     }
